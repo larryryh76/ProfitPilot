@@ -1,36 +1,33 @@
 const express = require('express');
 const router = express.Router();
-const auth = require('../middleware/auth');
 const User = require('../models/User');
+const auth = require('../middleware/auth');
 
-// Create a new token
-router.post('/token', auth, async (req, res) => {
+// Create Token Route
+router.post('/users/create-token', auth, async (req, res) => {
+  const { name } = req.body;
+
   try {
     const user = await User.findById(req.user.id);
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    if (!user.tokens) user.tokens = [];
-
     if (user.tokens.length >= 5) {
-      return res.status(400).json({ msg: 'You can only create up to 5 tokens.' });
+      return res.status(400).json({ msg: 'Token limit reached' });
     }
 
-    if (user.tokens.length >= 1) {
-      user.income = (user.income || 0) - 5; // Simulated $5 for extra tokens
-    }
+    const isFree = user.tokens.length === 0;
 
     const newToken = {
-      name: req.body.name,
-      createdAt: new Date(),
-      performance: [0]
+      name,
+      performanceData: [],
     };
 
     user.tokens.push(newToken);
-    await user.save();
+    if (!isFree) user.income -= 5;
 
-    res.json(user.tokens);
+    await user.save();
+    res.json({ msg: `Token '${name}' created${isFree ? ' for free' : ''}`, tokens: user.tokens });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 });
