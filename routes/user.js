@@ -60,5 +60,40 @@ router.get('/profile', auth, async (req, res) => {
     res.status(500).send('Server error');
   }
 });
+router.get('/profile', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user) return res.status(404).json({ msg: 'User not found' });
 
+    // Countdown logic
+    const countdownStart = new Date('2025-06-06T00:00:00Z');
+    const now = new Date();
+
+    let countdown = null;
+    let withdrawEnabled = false;
+
+    if (now >= countdownStart) {
+      const sixMonthsLater = new Date(countdownStart);
+      sixMonthsLater.setMonth(sixMonthsLater.getMonth() + 6);
+
+      const remaining = sixMonthsLater - now;
+      countdown = remaining > 0 ? remaining : 0;
+      withdrawEnabled = remaining <= 0;
+    }
+
+    res.json({
+      email: user.email,
+      balance: user.balance,
+      boostRate: user.boostRate,
+      income: user.income,
+      tokens: user.tokens,
+      joinedAt: user.joinedAt,
+      countdown,
+      withdrawEnabled
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
 module.exports = router;
