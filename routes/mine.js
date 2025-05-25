@@ -1,39 +1,36 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User');
-const authMiddleware = require('../middleware/auth');
+const auth = require('../middleware/auth');
 
-const TWO_HOURS = 2 * 60 * 60 * 1000;
-
-// GET /api/mine
-router.get('/mine', authMiddleware, async (req, res) => {
+// POST /api/users/mine
+router.post('/users/mine', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    if (user.tokens.length === 0) {
-      return res.status(400).json({ msg: 'Create at least one token to start mining' });
+    if (!user || user.tokens.length === 0) {
+      return res.status(400).json({ msg: 'No tokens found. Please create a token first.' });
     }
 
     const now = Date.now();
     const lastMined = user.lastMined || 0;
+    const cooldown = 2 * 60 * 60 * 1000; // 2 hours
 
-    if (now - lastMined < TWO_HOURS) {
-      const minutesLeft = Math.ceil((TWO_HOURS - (now - lastMined)) / 60000);
-      return res.status(400).json({ msg: `Please wait ${minutesLeft} minutes before mining again` });
+    if (now - lastMined < cooldown) {
+      const minutesLeft = Math.ceil((cooldown - (now - lastMined)) / 60000);
+      return res.status(400).json({ msg: `Please wait ${minutesLeft} more minutes.` });
     }
 
     const base = 0.7;
-    const boost = user.boostRate || 1;
-    const earned = base * boost;
+    const boost = Math.pow(2, user.boostLevel || 0);
+    const income = parseFloat((base * boost).toFixed(2));
 
-    user.income += earned;
+    user.income += income;
     user.lastMined = now;
     await user.save();
 
-    res.json({ msg: `Mined $${earned.toFixed(2)} successfully`, income: user.income });
+    res.json({ msg: `Mined $${income}`, income: user.income });
   } catch (err) {
+    console.error(err);
     res.status(500).json({ msg: 'Server error' });
   }
 });

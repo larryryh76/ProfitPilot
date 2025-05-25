@@ -1,37 +1,38 @@
 const express = require('express');
-const userRoutes = require('./routes/user');
 const mongoose = require('mongoose');
 const cors = require('cors');
 require('dotenv').config();
 
-const app = express();
+const authRoutes = require('./routes/auth');
+const userRoutes = require('./routes/user');
+const tokenRoutes = require('./routes/token');
+const mineRoutes = require('./routes/mine');
+const boostRoutes = require('./routes/boost');
+const leaderboardRoutes = require('./routes/leaderboard');
+const adminRoutes = require('./routes/admin');
 
-// Middlewa56r
+const app = express();
 app.use(cors());
 app.use(express.json());
-app.use('/api', require('./routes/token'));
-app.use('/api', require('./routes/mine'));
-app.use('/api', require('./routes/admin'));
-app.use('/api', require('./routes/leaderboard'));
-app.use('/api', require('./routes/boost'));
-app.use('/api/users', userRoutes);
-const authRoutes = require('./routes/auth');
+
+// API Routes
 app.use('/api', authRoutes);
-// Routes (placeholders for now)
-app.get("/", (req, res) => {
-  res.send("ProfitPilot backend is running!");
-});
+app.use('/api', tokenRoutes);
+app.use('/api', mineRoutes);
+app.use('/api', boostRoutes);
+app.use('/api', leaderboardRoutes);
+app.use('/api', adminRoutes);
+app.use('/api/users', userRoutes);
 
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URI)
+// Connect to MongoDB and start server
+mongoose.connect(process.env.MONGO_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+})
 .then(() => {
-  console.log("MongoDB Connected");
-}).catch((err) => {
-  console.error("MongoDB Connection Error:", err);
-});
-
-// Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+  console.log('MongoDB Connected');
+  app.listen(process.env.PORT || 5000, () =>
+    console.log(`Server running on port ${process.env.PORT || 5000}`)
+  );
+})
+.catch(err => console.error(err));
