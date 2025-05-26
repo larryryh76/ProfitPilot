@@ -1,34 +1,72 @@
 const express = require('express');
 const router = express.Router();
-const User = require('../models/User');
 const auth = require('../middleware/auth');
+const User = require('../models/User');
 
-// Create Token Route
-router.post('/users/create-token', auth, async (req, res) => {
+// @route   POST /api/token
+// @desc    Create a new token
+// @access  Private
+router.post('/', auth, async (req, res) => {
   const { name } = req.body;
+
+  if (!name || name.trim() === '') {
+    return res.status(400).json({ msg: 'Token name is required' });
+  }
 
   try {
     const user = await User.findById(req.user.id);
+
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    if (user.tokens.length >= 5) {
-      return res.status(400).json({ msg: 'Token limit reached' });
+    // Check if token with same name exists
+    const tokenExists = user.tokens.some(t => t.name.toLowerCase() === name.toLowerCase());
+    if (tokenExists) {
+      return res.status(400).json({ msg: 'Token name already exists' });
     }
 
+    // Check if user can create token
     const isFree = user.tokens.length === 0;
+    if (user.tokens.length >= 5) {
+      return res.status(400).json({ msg: 'Token limit reached (max 5)' });
+    }
 
-    const newToken = {
+    if (!isFree && user.income < 5) {
+      return res.status(400).json({ msg: 'Insufficient income to create token' });
+    }
+
+    // Deduct $5 if it's not the free one
+    if (!isFree) {
+      user.income -= 5;
+    }
+
+    // Add token
+    user.tokens.push({
       name,
-      performanceData: [],
-    };
-
-    user.tokens.push(newToken);
-    if (!isFree) user.income -= 5;
+      performanceData: [{ value: 0, date: new Date() }]
+    });
 
     await user.save();
-    res.json({ msg: `Token '${name}' created${isFree ? ' for free' : ''}`, tokens: user.tokens });
+    res.json({ msg: 'Token created successfully', tokens: user.tokens });
+
   } catch (err) {
-    res.status(500).json({ msg: 'Server error' });
+    console.error(err.message);
+    res.status(500).send('Server error');
+  }
+});
+
+// @route   GET /api/token
+// @desc    Get all tokens for current user
+// @access  Private
+router.get('/', auth, async (req, res) => {
+  try {
+    const user = await User.findById(req.user.id);
+
+    if (!user) return res.status(404).json({ msg: 'User not found' });
+
+    res.json(user.tokens);
+  } catch (err) {
+    console.error(err.message);
+    res.status(500).send('Server error');
   }
 });
 
