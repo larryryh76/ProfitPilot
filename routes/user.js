@@ -125,4 +125,15 @@ router.get('/profile', auth, async (req, res) => {
   }
 });
 
+// GET /api/users/referrals — returns list of users you referred
+router.get('/referrals', auth, async (req, res) => {
+  try {
+    const referredUsers = await User.find({ referredBy: req.user.id }).select('email registeredAt');
+    res.json(referredUsers);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
 module.exports = router;

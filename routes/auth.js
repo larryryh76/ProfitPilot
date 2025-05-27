@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const mongoose = require('mongoose');
 const User = require('../models/User');
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -26,12 +27,14 @@ router.post('/register', async (req, res) => {
     await user.save();
 
     // Handle referral bonus
-    if (referredBy) {
+    let referrerInfo = null;
+    if (referredBy && mongoose.Types.ObjectId.isValid(referredBy)) {
       const referrer = await User.findById(referredBy);
       if (referrer) {
         referrer.income += 2;
         referrer.referrals = (referrer.referrals || 0) + 1;
         await referrer.save();
+        referrerInfo = { id: referrer._id, email: referrer.email };
       }
     }
 
@@ -42,7 +45,7 @@ router.post('/register', async (req, res) => {
       user: {
         id: user._id,
         email: user.email,
-        referredBy: user.referredBy,
+        referredBy: referrerInfo,
       },
     });
   } catch (err) {
