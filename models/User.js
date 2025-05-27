@@ -1,8 +1,14 @@
 const mongoose = require('mongoose');
 
+const PerformanceDataSchema = new mongoose.Schema({
+  timestamp: { type: Date, default: Date.now },
+  rate: { type: Number, required: true }
+});
+
 const TokenSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  performanceData: { type: Array, default: [] }
+  currentRate: { type: Number, default: 0.7 },
+  performanceData: [PerformanceDataSchema]
 });
 
 const UserSchema = new mongoose.Schema({

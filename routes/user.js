@@ -22,9 +22,11 @@ router.post('/create-token', auth, async (req, res) => {
       return res.status(400).json({ msg: 'Insufficient income to create token' });
     }
 
+    const initialRate = 0.7;
     const newToken = {
       name,
-      performanceData: [],
+      currentRate: initialRate,
+      performanceData: [{ rate: initialRate }]
     };
 
     user.tokens.push(newToken);
@@ -41,13 +43,57 @@ router.post('/create-token', auth, async (req, res) => {
   }
 });
 
+// POST /api/users/boost-token
+router.post('/boost-token', auth, async (req, res) => {
+  const { tokenIndex } = req.body;
+
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || tokenIndex >= user.tokens.length) {
+      return res.status(404).json({ msg: 'Invalid user or token' });
+    }
+
+    const boostCost = 3;
+    if (user.income < boostCost) {
+      return res.status(400).json({ msg: 'Insufficient income to boost' });
+    }
+
+    const token = user.tokens[tokenIndex];
+
+    // Double the rate
+    token.currentRate *= 2;
+
+    // Log it to performanceData
+    token.performanceData.push({
+      rate: token.currentRate,
+      timestamp: new Date()
+    });
+
+    // Update user fields
+    user.income -= boostCost;
+    user.totalBoosts += 1;
+    user.boostRate *= 2;
+
+    await user.save();
+
+    res.json({
+      msg: 'Token successfully boosted',
+      tokens: user.tokens,
+      income: user.income,
+      boostRate: user.boostRate
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ msg: 'Server error' });
+  }
+});
+
 // GET /api/users/profile
 router.get('/profile', auth, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    // Countdown logic (withdraw unlocks 6 months after June 6, 2025)
     const countdownStart = new Date('2025-06-06T00:00:00Z');
     const now = new Date();
 
