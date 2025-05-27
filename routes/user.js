@@ -47,25 +47,7 @@ router.get('/profile', auth, async (req, res) => {
     const user = await User.findById(req.user.id).select('-password');
     if (!user) return res.status(404).json({ msg: 'User not found' });
 
-    res.json({
-      email: user.email,
-      income: user.income,
-      boostRate: user.boostRate,
-      referrals: user.referrals,
-      tokens: user.tokens,
-      createdAt: user.createdAt,
-    });
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
-  }
-});
-router.get('/profile', auth, async (req, res) => {
-  try {
-    const user = await User.findById(req.user.id);
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    // Countdown logic
+    // Countdown logic (withdraw unlocks 6 months after June 6, 2025)
     const countdownStart = new Date('2025-06-06T00:00:00Z');
     const now = new Date();
 
@@ -83,17 +65,18 @@ router.get('/profile', auth, async (req, res) => {
 
     res.json({
       email: user.email,
-      balance: user.balance,
-      boostRate: user.boostRate,
       income: user.income,
+      boostRate: user.boostRate,
+      referrals: user.referrals,
       tokens: user.tokens,
-      joinedAt: user.joinedAt,
+      createdAt: user.createdAt,
       countdown,
       withdrawEnabled
     });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ msg: 'Server error' });
+    console.error(err.message);
+    res.status(500).send('Server error');
   }
 });
+
 module.exports = router;
