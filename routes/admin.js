@@ -1,40 +1,52 @@
 const express = require('express');
 const router = express.Router();
+const { authenticateToken } = require('../middleware/auth');
 const User = require('../models/User');
-const authMiddleware = require('../middleware/auth');
 
-// Middleware to check admin access
-const requireAdmin = async (req, res, next) => {
-  const user = await User.findById(req.user.id);
-  if (!user || user.email !== 'larryryh76@gmail.com') {
-    return res.status(403).json({ msg: 'Access denied' });
+// Middleware to check if the user is admin
+const isAdmin = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user.id);
+    if (!user || !user.isAdmin) {
+      return res.status(403).json({ message: 'Access denied. Admins only.' });
+    }
+    next();
+  } catch (err) {
+    res.status(500).json({ message: 'Server error.' });
   }
-  next();
 };
 
-// GET all users
-router.get('/admin/users', authMiddleware, requireAdmin, async (req, res) => {
+// GET all users (admin only)
+router.get('/users', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const users = await User.find();
+    const users = await User.find().select('-password');
     res.json(users);
   } catch (err) {
-    res.status(500).json({ msg: 'Server error' });
+    res.status(500).json({ message: 'Server error.' });
   }
 });
 
-// POST /admin/reward — manually add reward
-router.post('/admin/reward', authMiddleware, requireAdmin, async (req, res) => {
-  const { userId, amount } = req.body;
+// DELETE a user by ID
+router.delete('/user/:id', authenticateToken, isAdmin, async (req, res) => {
   try {
-    const user = await User.findById(userId);
-    if (!user) return res.status(404).json({ msg: 'User not found' });
-
-    user.income += amount;
-    await user.save();
-
-    res.json({ msg: 'Reward sent', income: user.income });
+    await User.findByIdAndDelete(req.params.id);
+    res.json({ message: 'User deleted.' });
   } catch (err) {
-    res.status(500).json({ msg: 'Server error' });
+    res.status(500).json({ message: 'Server error.' });
+  }
+});
+
+// Promote a user to admin
+router.put('/promote/:id', authenticateToken, isAdmin, async (req, res) => {
+  try {
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { isAdmin: true },
+      { new: true }
+    );
+    res.json({ message: 'User promoted to admin.', user });
+  } catch (err) {
+    res.status(500).json({ message: 'Server error.' });
   }
 });
 

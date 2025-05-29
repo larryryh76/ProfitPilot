@@ -1,29 +1,25 @@
 const mongoose = require('mongoose');
 
-const PerformanceDataSchema = new mongoose.Schema({
-  timestamp: { type: Date, default: Date.now },
-  rate: { type: Number, required: true }
-});
-
-const TokenSchema = new mongoose.Schema({
+const tokenSchema = new mongoose.Schema({
   name: { type: String, required: true },
-  currentRate: { type: Number, default: 0.7 },
-  performanceData: [PerformanceDataSchema]
+  performanceData: [
+    {
+      value: { type: Number, default: 0 },
+      date: { type: Date, default: Date.now }
+    }
+  ]
 });
 
-const UserSchema = new mongoose.Schema({
+const userSchema = new mongoose.Schema({
+  name: { type: String },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  referredBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
-  referrals: { type: Number, default: 0 },
-  income: { type: Number, default: 0 },
-  balance: { type: Number, default: 0 },
-  boostRate: { type: Number, default: 1 },
-  totalBoosts: { type: Number, default: 0 },
-  tokens: [TokenSchema],
-  lastMined: { type: Date },
-  joinedAt: { type: Date, default: Date.now },
-  registeredAt: { type: Date, default: Date.now }
+  tokens: [tokenSchema],
+  income: { type: Number, default: 0.7 },
+  boostLevel: { type: Number, default: 0 }, // Increases with each $3 payment
+  referrals: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }],
+  isAdmin: { type: Boolean, default: false },
+  createdAt: { type: Date, default: Date.now }
 });
 
-module.exports = mongoose.model('User', UserSchema);
+module.exports = mongoose.model('User', userSchema);
