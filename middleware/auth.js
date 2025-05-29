@@ -3,7 +3,6 @@ const User = require('../models/User');
 
 const authenticateToken = async function (req, res, next) {
   const token = req.header('Authorization')?.replace('Bearer ', '');
-
   if (!token) {
     return res.status(401).json({ msg: 'No token, authorization denied' });
   }
@@ -12,9 +11,11 @@ const authenticateToken = async function (req, res, next) {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     console.log('Decoded token:', decoded);
 
-    const user = await User.findById(decoded.user.id);
+    const userId = decoded.user?.id || decoded.id; // ✅ safer
+    const user = await User.findById(userId);
+
     if (!user) {
-      console.log('User not found with ID:', decoded.user.id);
+      console.log('User not found with ID:', userId);
       return res.status(404).json({ msg: 'User not found' });
     }
 
