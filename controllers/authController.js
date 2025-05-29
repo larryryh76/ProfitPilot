@@ -1,33 +1,49 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { v4: uuidv4 } = require('uuid');
 
 exports.registerUser = async (req, res) => {
-  const { email, password, referrer } = req.body;
+  const { email, password, referralCode } = req.body;
 
-  if (!email || !password) return res.status(400).json({ msg: 'All fields are required' });
+  if (!email || !password) {
+    return res.status(400).json({ msg: 'All fields are required' });
+  }
 
   try {
-    let user = await User.findOne({ email });
-    if (user) return res.status(400).json({ msg: 'User already exists' });
+    let existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ msg: 'User already exists' });
+    }
 
     const salt = await bcrypt.genSalt(10);
     const hashed = await bcrypt.hash(password, salt);
 
-    user = new User({ email, password: hashed });
-    await user.save();
+    // Generate unique referral code for new user
+    const newReferralCode = uuidv4().slice(0, 8); // Shorter code (e.g., 'a1b2c3d4')
 
-    // ✅ Referral logic
-    if (referrer) {
-      const referrerUser = await User.findById(referrer);
+    const newUser = new User({
+      email,
+      password: hashed,
+      income: 0.7,
+      referralCode: newReferralCode
+    });
+
+    // ✅ Handle referral if valid referralCode is provided
+    if (referralCode) {
+      const referrerUser = await User.findOne({ referralCode });
+
       if (referrerUser) {
+        // Reward referrer and track referral
         referrerUser.income += 2;
-        referrerUser.referrals.push(user._id);
+        newUser.referredBy = referrerUser.referralCode;
         await referrerUser.save();
       }
     }
 
-    const payload = { user: { id: user.id } };
+    await newUser.save();
+
+    const payload = { user: { id: newUser.id } };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
     res.json({ token });
@@ -40,7 +56,9 @@ exports.registerUser = async (req, res) => {
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
 
-  if (!email || !password) return res.status(400).json({ msg: 'All fields are required' });
+  if (!email || !password) {
+    return res.status(400).json({ msg: 'All fields are required' });
+  }
 
   try {
     const user = await User.findOne({ email });
