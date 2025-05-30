@@ -1,8 +1,10 @@
 const express = require('express');
 const router = express.Router();
+const authMiddleware = require('../middleware/authMiddleware');
 const { getLeaderboard } = require('../controllers/leaderboardController');
-const { authenticateToken } = require('../middleware/auth');
 
-router.get('/', authenticateToken, getLeaderboard);
+router.use(authMiddleware);
+
+router.get('/', getLeaderboard);
 
 module.exports = router;

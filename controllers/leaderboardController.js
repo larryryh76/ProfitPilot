@@ -1,18 +1,16 @@
-// controllers/leaderboardController.js
-const Token = require('../models/Token');
 const User = require('../models/User');
 
 exports.getLeaderboard = async (req, res) => {
   try {
-    const topTokens = await Token.find()
-      .sort({ boostLevel: -1 }) // or sort by income, if desired
+    // Sort users by boostMultiplier descending, limit top 10
+    const topUsers = await User.find()
+      .sort({ boostMultiplier: -1 })
       .limit(10)
-      .populate('user', 'username email') // include user info
-      .select('name income boostLevel user'); // include only relevant fields
+      .select('email boostMultiplier income tokensCreated');
 
-    res.json(topTokens);
-  } catch (err) {
-    console.error(err.message);
-    res.status(500).send('Server error');
+    res.status(200).json(topUsers);
+  } catch (error) {
+    console.error('Leaderboard fetch error:', error);
+    res.status(500).json({ msg: 'Server error' });
   }
 };

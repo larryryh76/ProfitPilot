@@ -1,78 +1,101 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
-const { v4: uuidv4 } = require('uuid');
+const { v4: uuidv4 } = require('uuid'); // for referral code
 
-exports.registerUser = async (req, res) => {
-  const { email, password, referralCode } = req.body;
+// Helper: generate referral code (unique)
+function generateReferralCode() {
+  return uuidv4().slice(0, 8); // short 8 chars code
+}
 
-  if (!email || !password) {
-    return res.status(400).json({ msg: 'All fields are required' });
-  }
-
+exports.register = async (req, res) => {
   try {
-    let existingUser = await User.findOne({ email });
-    if (existingUser) {
+    const { email, password, referralCode } = req.body;
+
+    // Check required fields
+    if (!email || !password) {
+      return res.status(400).json({ msg: 'Please provide email and password' });
+    }
+
+    // Check if user exists
+    let user = await User.findOne({ email });
+    if (user) {
       return res.status(400).json({ msg: 'User already exists' });
     }
 
+    // Hash password
     const salt = await bcrypt.genSalt(10);
-    const hashed = await bcrypt.hash(password, salt);
+    const hashedPassword = await bcrypt.hash(password, salt);
 
-    // Generate unique referral code for new user
-    const newReferralCode = uuidv4().slice(0, 8); // Shorter code (e.g., 'a1b2c3d4')
-
-    const newUser = new User({
+    // Prepare user object
+    user = new User({
       email,
-      password: hashed,
-      income: 0.7,
-      referralCode: newReferralCode
+      password: hashedPassword,
+      referralCode: generateReferralCode(),
+      isAdmin: email === process.env.ADMIN_EMAIL // admin flag
     });
 
-    // ✅ Handle referral if valid referralCode is provided
+    // Handle referral
     if (referralCode) {
-      const referrerUser = await User.findOne({ referralCode });
-
-      if (referrerUser) {
-        // Reward referrer and track referral
-        referrerUser.income += 2;
-        newUser.referredBy = referrerUser.referralCode;
-        await referrerUser.save();
+      const refUser = await User.findOne({ referralCode });
+      if (refUser) {
+        user.referredBy = referralCode;
+        // Add current user as referral to refUser
+        refUser.referrals.push(user._id);
+        await refUser.save();
       }
     }
 
-    await newUser.save();
+    await user.save();
 
-    const payload = { user: { id: newUser.id } };
+    // Create JWT token
+    const payload = {
+      user: {
+        id: user.id
+      }
+    };
+
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    res.json({ token });
-  } catch (err) {
-    console.error('Register error:', err.message);
-    res.status(500).send('Server error');
+    res.status(201).json({ token, msg: 'Registration successful' });
+  } catch (error) {
+    console.error('Register error:', error);
+    res.status(500).json({ msg: 'Server error' });
   }
 };
 
-exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    return res.status(400).json({ msg: 'All fields are required' });
-  }
-
+exports.login = async (req, res) => {
   try {
+    const { email, password } = req.body;
+
+    // Check required fields
+    if (!email || !password) {
+      return res.status(400).json({ msg: 'Please provide email and password' });
+    }
+
     const user = await User.findOne({ email });
-    if (!user) return res.status(400).json({ msg: 'Invalid credentials' });
+    if (!user) {
+      return res.status(400).json({ msg: 'Invalid credentials' });
+    }
 
+    // Compare passwords
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ msg: 'Invalid credentials' });
+    if (!isMatch) {
+      return res.status(400).json({ msg: 'Invalid credentials' });
+    }
 
-    const payload = { user: { id: user.id } };
+    // Create JWT token
+    const payload = {
+      user: {
+        id: user.id
+      }
+    };
+
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '7d' });
 
-    res.json({ token });
-  } catch (err) {
-    console.error('Login error:', err.message);
-    res.status(500).send('Server error');
+    res.json({ token, msg: 'Login successful' });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ msg: 'Server error' });
   }
 };
